@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>M365 — Service Status</title>
+  <title>M365 — Live Service Status</title>
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,7 +14,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
@@ -22,12 +21,13 @@
             mono: ['JetBrains Mono', 'monospace'],
           },
           colors: {
-            slatex: {
-              950: '#070b14',
-              900: '#0b1120',
-              850: '#0f172a',
-              800: '#162033',
-              750: '#1e293b',
+            fluent: {
+              bg: '#F8FAFC',
+              card: '#FFFFFF',
+              ink: '#0F172A',
+              muted: '#475569',
+              border: '#E2E8F0',
+              brand: '#0078D4'
             }
           }
         }
@@ -35,24 +35,10 @@
     };
   </script>
   <style>
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #0b1120;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #1e293b;
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #334155;
-    }
     @keyframes pulseRing {
-      0% { transform: scale(0.85); opacity: 0.85; }
-      70% { transform: scale(1.65); opacity: 0; }
-      100% { transform: scale(1.65); opacity: 0; }
+      0% { transform: scale(0.85); opacity: 0.75; }
+      70% { transform: scale(1.75); opacity: 0; }
+      100% { transform: scale(1.75); opacity: 0; }
     }
     .status-pulse::before {
       content: '';
@@ -62,755 +48,718 @@
       background: inherit;
       animation: pulseRing 2.2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
     }
+    details > summary {
+      list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
   </style>
 </head>
-<body class="bg-slatex-900 text-slate-100 font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200 min-h-screen flex flex-col">
+<body class="bg-fluent-bg text-fluent-ink font-sans antialiased selection:bg-sky-100 selection:text-sky-900 min-h-screen flex flex-col">
 
   <!-- Toast Notification Container (Replaces alert) -->
   <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- Settings Modal for Optional Custom Public Status JSON Feed -->
-  <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-    <div class="bg-slatex-850 border border-slate-700/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+  <!-- Optional Maintainer Info Modal (How Live Sync & GitHub Action Work) -->
+  <div id="sync-info-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
         <div class="flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-            <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+          <div class="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-200">
+            <i data-lucide="radio" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-base font-bold text-white">Status Feed Settings</h3>
-            <p class="text-xs text-slate-400">Configure public status feed preferences</p>
+            <h3 class="text-base font-bold text-slate-900">How Live Status Sync Works</h3>
+            <p class="text-xs text-slate-500">Zero-backend architecture for GitHub Pages</p>
           </div>
         </div>
-        <button id="close-settings-btn" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+        <button id="close-sync-modal-btn" class="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div class="space-y-4 text-sm">
-        <div class="p-3.5 rounded-xl bg-slatex-900 border border-slate-800 text-xs text-slate-300 leading-relaxed">
-          <strong class="text-sky-400 block mb-1">How Live Checks Work on GitHub Pages</strong>
-          Because this page runs directly in your browser without a backend server, cross-origin browser rules prevent direct scraping of <code class="text-slate-200">status.cloud.microsoft</code> and <code class="text-slate-200">downdetector.com</code>. You can open both public portals directly with one click or connect a public JSON status feed URL below.
-        </div>
-
-        <div>
-          <label for="custom-webhook-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-            Optional Public Status JSON Feed URL
-          </label>
-          <input
-            id="custom-webhook-input"
-            type="url"
-            placeholder="https://example.com/api/m365-public-status.json"
-            class="w-full px-3.5 py-2.5 rounded-xl bg-slatex-900 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono text-xs"
-          />
-          <p class="text-[11px] text-slate-500 mt-1.5">
-            Expected JSON format: <code class="text-slate-400">{ "overall": "healthy|degraded|outage" }</code>
+      <div class="space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed">
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+          <p class="font-semibold text-slate-900 mb-1">1. Automatic Live Browser Feed (Active Now)</p>
+          <p>
+            This page automatically fetches live Microsoft 365 component statuses and active incidents directly from the open, CORS-enabled <strong>MicrosoftRadar Statuspage v2 JSON API</strong> (<code class="text-xs bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-800">microsoftradar.com/scope/microsoft-365/api/v2/summary.json</code>) every 60 seconds—no API key or backend required.
           </p>
         </div>
 
-        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-          <button id="reset-webhook-btn" class="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">
-            Clear Custom URL
-          </button>
-          <button id="save-settings-btn" class="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-slate-950 transition shadow-lg shadow-sky-500/20">
-            Save &amp; Refresh
-          </button>
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="flex items-center justify-between mb-1.5">
+            <p class="font-semibold text-slate-900">2. Optional: Custom <code class="text-xs">./status.json</code> via GitHub Actions</p>
+            <button id="copy-gha-btn" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-sky-700 border border-slate-200 transition">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copy Workflow</span>
+            </button>
+          </div>
+          <p class="mb-2.5">
+            Before querying the public API, this page checks for a local <code class="text-xs bg-white px-1.5 py-0.5 rounded border border-slate-200">./status.json</code> file in your repository. If you ever want to mirror status data directly into your GitHub repo on a schedule, add <code class="text-xs bg-white px-1.5 py-0.5 rounded border border-slate-200">.github/workflows/sync-status.yml</code>:
+          </p>
+          <pre id="gha-snippet" class="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] overflow-x-auto leading-relaxed">name: Sync M365 Status
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Live M365 Status JSON
+        run: curl -sL "https://microsoftradar.com/scope/microsoft-365/api/v2/summary.json" -o status.json
+      - name: Commit Updated Status
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add status.json
+          git diff --staged --quiet || git commit -m "chore: update M365 status"
+          git push</pre>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Top Navigation Header (Public Sources Only — Zero Admin Links) -->
-  <header class="sticky top-0 z-30 bg-slatex-950/90 backdrop-blur-md border-b border-slate-800/90">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+  <!-- Top Navigation Header (Clean Light Fluent Bar — Zero Admin Links) -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
       <!-- Brand Identity -->
       <div class="flex items-center gap-3 min-w-0">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 shrink-0">
+        <div class="w-10 h-10 rounded-xl bg-[#0078D4] flex items-center justify-center shadow-sm shrink-0">
           <i data-lucide="cloud-check" class="w-5 h-5 text-white"></i>
         </div>
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-white">M365</h1>
-            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/20">
-              Service Status
+            <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">M365</h1>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+              Live Status
             </span>
           </div>
-          <p class="text-xs text-slate-400 truncate">Live Cloud App Health &amp; User Status</p>
+          <p class="text-xs text-slate-500 truncate">Real-Time Microsoft 365 Service Health</p>
         </div>
       </div>
 
-      <!-- Public Verification Links (No Login Required) -->
+      <!-- Public Verification Links (No Admin Login Required) -->
       <nav class="hidden md:flex items-center gap-2">
         <a href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer"
-           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium bg-slatex-850 hover:bg-slate-800 text-slate-200 border border-slate-700/80 hover:border-sky-500/50 transition">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span>status.cloud.microsoft</span>
           <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-400"></i>
         </a>
         <a href="https://downdetector.com/status/microsoft-365/" target="_blank" rel="noopener noreferrer"
-           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium bg-slatex-850 hover:bg-slate-800 text-slate-200 border border-slate-700/80 hover:border-amber-500/50 transition">
-          <i data-lucide="activity" class="w-3.5 h-3.5 text-amber-400"></i>
+           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition">
+          <i data-lucide="activity" class="w-3.5 h-3.5 text-amber-500"></i>
           <span>Downdetector M365</span>
           <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-400"></i>
         </a>
       </nav>
 
-      <!-- Right Controls: Clock, Refresh, Settings -->
-      <div class="flex items-center gap-2">
-        <div class="hidden sm:flex flex-col items-end mr-1 text-right">
-          <span id="live-clock" class="text-xs font-mono font-semibold text-slate-200">--:--:--</span>
-          <span id="last-checked" class="text-[11px] text-slate-400">Syncing...</span>
+      <!-- Right Live Telemetry Timestamp & Manual Refresh -->
+      <div class="flex items-center gap-2.5">
+        <div class="hidden sm:flex flex-col items-end text-right">
+          <span id="last-checked" class="text-xs font-semibold text-slate-800">Connecting...</span>
+          <span id="auto-refresh-label" class="text-[11px] font-mono text-slate-400">Auto-refresh in 60s</span>
         </div>
 
-        <button id="refresh-status-btn" title="Refresh Service Health"
-                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slatex-850 hover:bg-slate-800 text-sky-400 border border-slate-700/80 transition">
+        <button id="refresh-status-btn" title="Refresh Live Status Now"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#0078D4] hover:bg-[#106EBE] text-white shadow-sm transition">
           <i id="refresh-icon" data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-          <span>Refresh</span>
-        </button>
-
-        <button id="open-settings-btn" title="Feed Settings"
-                class="p-2 rounded-xl bg-slatex-850 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition">
-          <i data-lucide="settings" class="w-4 h-4"></i>
+          <span>Refresh Now</span>
         </button>
       </div>
     </div>
 
-    <!-- Mobile Public Status Links Bar -->
-    <div class="flex md:hidden items-center gap-2 px-4 py-2 border-t border-slate-800/80 overflow-x-auto bg-slatex-900/90">
+    <!-- Mobile Quick Verification Bar -->
+    <div class="flex md:hidden items-center gap-2 px-4 py-2 border-t border-slate-100 overflow-x-auto bg-slate-50/90">
       <a href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer"
-         class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slatex-850 text-slate-200 border border-slate-700/70">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+         class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-slate-700 border border-slate-200">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
         <span>status.cloud.microsoft</span>
         <i data-lucide="external-link" class="w-3 h-3 text-slate-400"></i>
       </a>
       <a href="https://downdetector.com/status/microsoft-365/" target="_blank" rel="noopener noreferrer"
-         class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slatex-850 text-slate-200 border border-slate-700/70">
-        <i data-lucide="activity" class="w-3 h-3 text-amber-400"></i>
+         class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-slate-700 border border-slate-200">
+        <i data-lucide="activity" class="w-3 h-3 text-amber-500"></i>
         <span>Downdetector M365</span>
         <i data-lucide="external-link" class="w-3 h-3 text-slate-400"></i>
       </a>
     </div>
   </header>
 
-  <!-- Main Full-Width End-User Dashboard -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+  <!-- Main Single-Column Dashboard Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
 
-    <!-- Status Feed Bar & State Preview Toggles -->
-    <div class="flex flex-wrap items-center justify-between gap-3 bg-slatex-850/90 border border-slate-800 rounded-2xl px-4 py-3">
-      <div class="flex items-center gap-2.5 flex-wrap">
-        <span id="feed-source-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/25">
+    <!-- Live Feed Telemetry Strip (Read-Only — Zero Fake/Sim Buttons) -->
+    <div class="flex flex-wrap items-center justify-between gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-xs">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span id="feed-source-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
           <i data-lucide="radio" class="w-3.5 h-3.5"></i>
-          <span id="feed-source-text">Checking Public Feeds...</span>
+          <span id="feed-source-text">Fetching live telemetry...</span>
         </span>
-        <span class="text-xs text-slate-400 hidden sm:inline">
-          No admin login required • Public status overview
-        </span>
+        <span id="feed-generated-at" class="text-xs text-slate-500"></span>
       </div>
-
-      <!-- Plain-Language State Preview Toggles -->
-      <div class="flex items-center gap-1.5">
-        <span class="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mr-1">Preview State:</span>
-        <button data-sim="healthy" class="sim-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 transition">
-          All Normal
-        </button>
-        <button data-sim="advisory" class="sim-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slatex-900 text-slate-400 border border-slate-700/70 hover:text-amber-300 transition">
-          Minor Slowdown
-        </button>
-        <button data-sim="outage" class="sim-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slatex-900 text-slate-400 border border-slate-700/70 hover:text-rose-300 transition">
-          Service Disruption
-        </button>
+      <div class="text-xs text-slate-500 flex items-center gap-1.5">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+        <span>Live Read-Only Status</span>
       </div>
     </div>
 
     <!-- Overall Suite Health Hero Banner -->
-    <section id="overall-banner" class="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/50 via-slatex-850 to-slatex-850 p-5 sm:p-6 shadow-xl">
+    <section id="overall-banner" class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm transition-all">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex items-start sm:items-center gap-4">
-          <div id="overall-icon-wrap" class="relative w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-            <span id="overall-pulse" class="status-pulse w-3.5 h-3.5 rounded-full bg-emerald-400"></span>
+          <div id="overall-icon-wrap" class="relative w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
+            <span id="overall-pulse" class="status-pulse w-3.5 h-3.5 rounded-full bg-sky-500"></span>
           </div>
           <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <h2 id="overall-title" class="text-lg sm:text-xl font-bold text-white">
-                All Microsoft 365 Apps Are Up &amp; Running
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h2 id="overall-title" class="text-lg sm:text-xl font-bold text-slate-900">
+                Checking Live Microsoft 365 Status...
               </h2>
-              <span id="overall-pill" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Healthy
+              <span id="overall-pill" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                Syncing
               </span>
             </div>
-            <p id="overall-subtitle" class="text-xs sm:text-sm text-slate-300 mt-1">
-              Outlook, Teams, OneDrive, SharePoint, and Office apps are working normally. If you experience an issue, check your Wi-Fi/VPN or try the web app.
+            <p id="overall-subtitle" class="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+              Querying live public service health telemetry for Outlook, Teams, OneDrive, SharePoint, and Microsoft 365 apps.
             </p>
           </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 shrink-0">
           <a href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer"
-             class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700 transition">
-            <span>Microsoft Public Status</span>
-            <i data-lucide="arrow-up-right" class="w-4 h-4 text-sky-400"></i>
+             class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition">
+            <span>Microsoft Official Status</span>
+            <i data-lucide="arrow-up-right" class="w-4 h-4 text-sky-300"></i>
           </a>
           <a href="https://downdetector.com/status/microsoft-365/" target="_blank" rel="noopener noreferrer"
-             class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700 transition">
+             class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 transition">
             <span>Downdetector</span>
-            <i data-lucide="arrow-up-right" class="w-4 h-4 text-amber-400"></i>
+            <i data-lucide="arrow-up-right" class="w-4 h-4 text-amber-500"></i>
           </a>
         </div>
       </div>
     </section>
 
-    <!-- Core End-User Apps & Services Grid (8 Apps) -->
+    <!-- Active Live Outages / Advisories Banner (Only visible when real incidents exist!) -->
+    <section id="active-incidents-section" class="hidden space-y-3">
+      <div class="flex items-center gap-2">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i>
+        <h3 class="text-sm font-bold uppercase tracking-wider text-rose-700">Active Service Disruptions &amp; Advisories</h3>
+      </div>
+      <div id="active-incidents-list" class="space-y-3"></div>
+    </section>
+
+    <!-- Core End-User Apps & Services Grid -->
     <section>
       <div class="flex items-center justify-between mb-3.5">
         <div class="flex items-center gap-2">
-          <i data-lucide="layout-grid" class="w-4 h-4 text-sky-400"></i>
-          <h3 class="text-sm font-bold uppercase tracking-wider text-slate-300">Everyday Apps &amp; Services</h3>
+          <i data-lucide="layout-grid" class="w-4 h-4 text-[#0078D4]"></i>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-slate-700">Core Microsoft 365 Apps &amp; Services</h3>
         </div>
-        <span class="text-xs text-slate-400">8 Monitored User Apps</span>
+        <span id="component-count-label" class="text-xs text-slate-500">Loading components...</span>
       </div>
 
       <div id="services-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- App status cards injected dynamically via JS -->
+        <!-- Skeleton loaders shown while live fetch runs -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-36"></div>
       </div>
     </section>
 
-    <!-- Middle Two-Column Section: Plain-English Updates + Interactive 24h Outage Pulse -->
+    <!-- Two-Column Section: Real Incident History + Quick Web App Launchers -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-      <!-- Service Updates & What You Should Know (7 cols) -->
-      <div class="lg:col-span-7 bg-slatex-850 border border-slate-800 rounded-2xl p-5 flex flex-col">
-        <div class="flex items-center justify-between gap-2 pb-4 border-b border-slate-800">
+      <!-- Real Incident & Advisory History Feed (7 cols) -->
+      <div class="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col">
+        <div class="flex items-center justify-between gap-2 pb-4 border-b border-slate-100">
           <div class="flex items-center gap-2.5">
-            <div class="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-              <i data-lucide="info" class="w-4 h-4"></i>
+            <div class="p-2 rounded-xl bg-sky-50 text-[#0078D4] border border-sky-100">
+              <i data-lucide="history" class="w-4 h-4"></i>
             </div>
             <div>
-              <h3 class="text-sm font-bold text-white">Service Updates &amp; User Guidance</h3>
-              <p class="text-xs text-slate-400">Plain-English status notes and workarounds</p>
+              <h3 class="text-sm font-bold text-slate-900">Recent Microsoft 365 Incident History</h3>
+              <p class="text-xs text-slate-500">Live public incident log &amp; official Microsoft advisories</p>
             </div>
           </div>
           <a href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer"
-             class="text-xs font-medium text-sky-400 hover:text-sky-300 inline-flex items-center gap-1">
-            <span>Official Page</span>
+             class="text-xs font-semibold text-[#0078D4] hover:underline inline-flex items-center gap-1">
+            <span>Official Portal</span>
             <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
           </a>
         </div>
 
-        <div id="advisories-list" class="mt-4 space-y-3 flex-1">
-          <!-- Plain-English advisory items injected via JS -->
+        <div id="recent-incidents-list" class="mt-4 space-y-3 flex-1">
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 animate-pulse">
+            Loading live incident history...
+          </div>
         </div>
       </div>
 
-      <!-- Interactive Downdetector-Style 24h Crowd Outage Pulse (5 cols) -->
-      <div class="lg:col-span-5 bg-slatex-850 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
-        <div>
-          <div class="flex items-center justify-between gap-2 pb-4 border-b border-slate-800">
-            <div class="flex items-center gap-2.5">
-              <div class="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <i data-lucide="activity" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h3 class="text-sm font-bold text-white">Community Outage Pulse (24h)</h3>
-                <p class="text-xs text-slate-400">User report volume vs. normal baseline</p>
-              </div>
-            </div>
-            <span id="crowd-status-tag" class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              Normal Baseline
-            </span>
-          </div>
+      <!-- Right Column: Quick Web App Launchers + End-User Self-Help Accordion (5 cols) -->
+      <div class="lg:col-span-5 space-y-6">
 
-          <!-- Interactive Hoverable SVG Trend Chart -->
-          <div class="mt-4 bg-slatex-900/90 border border-slate-800/90 rounded-xl p-3.5 relative">
-            <div class="flex items-center justify-between text-xs mb-2">
-              <span id="chart-hover-time" class="text-slate-400">Hover chart to inspect 24h trend</span>
-              <span id="crowd-peak-label" class="font-mono font-semibold text-sky-400">Current: 14 reports</span>
-            </div>
-            <div class="w-full h-36 relative">
-              <svg id="outage-chart-svg" viewBox="0 0 400 130" class="w-full h-full overflow-visible cursor-crosshair">
-                <!-- Rendered dynamically via JS -->
-              </svg>
-            </div>
-            <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 mt-1">
-              <span>-24h</span>
-              <span>-18h</span>
-              <span>-12h</span>
-              <span>-6h</span>
-              <span>Now</span>
-            </div>
-          </div>
-
-          <!-- Most Reported User Areas -->
-          <div class="mt-4 space-y-2.5">
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Most Reported Areas</p>
-            <div class="space-y-2 text-xs">
-              <div>
-                <div class="flex justify-between text-slate-300 mb-1">
-                  <span>Outlook &amp; Email Access</span>
-                  <span id="vec-exchange" class="font-mono text-slate-400">42%</span>
-                </div>
-                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div id="bar-exchange" class="h-full bg-sky-400 rounded-full transition-all duration-500" style="width: 42%"></div>
-                </div>
-              </div>
-              <div>
-                <div class="flex justify-between text-slate-300 mb-1">
-                  <span>Microsoft Teams Calls &amp; Chat</span>
-                  <span id="vec-teams" class="font-mono text-slate-400">33%</span>
-                </div>
-                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div id="bar-teams" class="h-full bg-indigo-400 rounded-full transition-all duration-500" style="width: 33%"></div>
-                </div>
-              </div>
-              <div>
-                <div class="flex justify-between text-slate-300 mb-1">
-                  <span>OneDrive &amp; SharePoint Files</span>
-                  <span id="vec-spo" class="font-mono text-slate-400">25%</span>
-                </div>
-                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div id="bar-spo" class="h-full bg-emerald-400 rounded-full transition-all duration-500" style="width: 25%"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-5 pt-3 border-t border-slate-800">
-          <a href="https://downdetector.com/status/microsoft-365/" target="_blank" rel="noopener noreferrer"
-             class="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition">
-            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-            <span>View Live Crowd Reports on Downdetector</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <!-- Bottom Two-Column Section: End-User Web App Launchers & Self-Help Troubleshooting Tips -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-      <!-- Public Web App Quick Launchers (5 cols) -->
-      <div class="lg:col-span-5 bg-slatex-850 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
-        <div>
-          <div class="flex items-center gap-2.5 pb-4 border-b border-slate-800">
-            <div class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+        <!-- Quick Web App Launchers -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+          <div class="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
+            <div class="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
               <i data-lucide="compass" class="w-4 h-4"></i>
             </div>
             <div>
-              <h3 class="text-sm font-bold text-white">Quick Web App Links</h3>
-              <p class="text-xs text-slate-400">Switch to browser versions if desktop apps stall</p>
+              <h3 class="text-sm font-bold text-slate-900">Quick Web App Launchers</h3>
+              <p class="text-xs text-slate-500">Open browser versions if desktop apps stall</p>
             </div>
           </div>
 
-          <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+          <div class="mt-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
             <a href="https://m365.cloud.microsoft/" target="_blank" rel="noopener noreferrer"
-               class="flex items-center justify-between p-3 rounded-xl bg-slatex-900/90 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 transition group">
-              <div class="flex items-center gap-3">
-                <div class="p-2 rounded-lg bg-sky-500/10 text-sky-400">
+               class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-sky-50/60 border border-slate-200 hover:border-sky-300 transition group">
+              <div class="flex items-center gap-2.5">
+                <div class="p-1.5 rounded-lg bg-white border border-slate-200 text-[#0078D4]">
                   <i data-lucide="sparkles" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <span class="text-xs font-bold text-white block">Microsoft 365 &amp; Copilot Portal</span>
-                  <span class="text-[11px] text-slate-400">m365.cloud.microsoft</span>
+                  <span class="text-xs font-bold text-slate-900 block">Microsoft 365 &amp; Copilot</span>
+                  <span class="text-[11px] text-slate-500">m365.cloud.microsoft</span>
                 </div>
               </div>
-              <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-500 group-hover:text-sky-400 transition"></i>
+              <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-400 group-hover:text-[#0078D4] transition"></i>
             </a>
 
             <a href="https://outlook.office.com/" target="_blank" rel="noopener noreferrer"
-               class="flex items-center justify-between p-3 rounded-xl bg-slatex-900/90 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 transition group">
-              <div class="flex items-center gap-3">
-                <div class="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+               class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-sky-50/60 border border-slate-200 hover:border-sky-300 transition group">
+              <div class="flex items-center gap-2.5">
+                <div class="p-1.5 rounded-lg bg-white border border-slate-200 text-blue-600">
                   <i data-lucide="mail" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <span class="text-xs font-bold text-white block">Outlook on the Web</span>
-                  <span class="text-[11px] text-slate-400">outlook.office.com</span>
+                  <span class="text-xs font-bold text-slate-900 block">Outlook on the Web</span>
+                  <span class="text-[11px] text-slate-500">outlook.office.com</span>
                 </div>
               </div>
-              <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-500 group-hover:text-sky-400 transition"></i>
+              <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition"></i>
             </a>
 
             <a href="https://teams.microsoft.com/" target="_blank" rel="noopener noreferrer"
-               class="flex items-center justify-between p-3 rounded-xl bg-slatex-900/90 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 transition group">
-              <div class="flex items-center gap-3">
-                <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+               class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 transition group">
+              <div class="flex items-center gap-2.5">
+                <div class="p-1.5 rounded-lg bg-white border border-slate-200 text-indigo-600">
                   <i data-lucide="video" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <span class="text-xs font-bold text-white block">Microsoft Teams Web</span>
-                  <span class="text-[11px] text-slate-400">teams.microsoft.com</span>
+                  <span class="text-xs font-bold text-slate-900 block">Microsoft Teams Web</span>
+                  <span class="text-[11px] text-slate-500">teams.microsoft.com</span>
                 </div>
               </div>
-              <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition"></i>
+              <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition"></i>
+            </a>
+
+            <a href="https://onedrive.live.com/" target="_blank" rel="noopener noreferrer"
+               class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-sky-50/60 border border-slate-200 hover:border-sky-300 transition group">
+              <div class="flex items-center gap-2.5">
+                <div class="p-1.5 rounded-lg bg-white border border-slate-200 text-sky-600">
+                  <i data-lucide="cloud" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <span class="text-xs font-bold text-slate-900 block">OneDrive Cloud Files</span>
+                  <span class="text-[11px] text-slate-500">onedrive.live.com</span>
+                </div>
+              </div>
+              <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-400 group-hover:text-sky-600 transition"></i>
             </a>
           </div>
         </div>
-      </div>
 
-      <!-- End-User Self-Help Troubleshooting Tips (7 cols) -->
-      <div class="lg:col-span-7 bg-slatex-850 border border-slate-800 rounded-2xl p-5">
-        <div class="flex items-center gap-2.5 pb-4 border-b border-slate-800">
-          <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <i data-lucide="life-buoy" class="w-4 h-4"></i>
+        <!-- End-User Self-Help Troubleshooting Accordion -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+          <div class="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
+            <div class="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <i data-lucide="life-buoy" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Self-Help Troubleshooting</h3>
+              <p class="text-xs text-slate-500">If status is green above, try these quick steps</p>
+            </div>
           </div>
-          <div>
-            <h3 class="text-sm font-bold text-white">Quick Self-Help Troubleshooting Tips</h3>
-            <p class="text-xs text-slate-400">Try these quick steps if Microsoft 365 looks green above, but an app isn't working for you</p>
+
+          <div class="mt-3.5 space-y-2">
+            <details class="group rounded-xl border border-slate-200 bg-slate-50/70 open:bg-white transition">
+              <summary class="flex items-center justify-between p-3 cursor-pointer text-xs font-semibold text-slate-800">
+                <span class="flex items-center gap-2">
+                  <i data-lucide="globe" class="w-3.5 h-3.5 text-[#0078D4]"></i>
+                  1. Test in an Incognito / Private Browser
+                </span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-3 pb-3 text-xs text-slate-600 leading-relaxed">
+                Stale browser cookies often cause login loops or blank pages. Open a Private/Incognito window and sign in at <strong>m365.cloud.microsoft</strong> to verify if the issue is local to your browser cache.
+              </div>
+            </details>
+
+            <details class="group rounded-xl border border-slate-200 bg-slate-50/70 open:bg-white transition">
+              <summary class="flex items-center justify-between p-3 cursor-pointer text-xs font-semibold text-slate-800">
+                <span class="flex items-center gap-2">
+                  <i data-lucide="wifi" class="w-3.5 h-3.5 text-amber-600"></i>
+                  2. Check Corporate VPN or Wi-Fi Portal
+                </span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-3 pb-3 text-xs text-slate-600 leading-relaxed">
+                VPN disconnects or hotel/public Wi-Fi captive portals can block Teams calls and OneDrive sync while regular websites still load. Disconnect and reconnect your VPN or test on a mobile hotspot.
+              </div>
+            </details>
+
+            <details class="group rounded-xl border border-slate-200 bg-slate-50/70 open:bg-white transition">
+              <summary class="flex items-center justify-between p-3 cursor-pointer text-xs font-semibold text-slate-800">
+                <span class="flex items-center gap-2">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-600"></i>
+                  3. Desktop App vs. Web App Check
+                </span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-3 pb-3 text-xs text-slate-600 leading-relaxed">
+                If desktop Outlook or Teams freezes, right-click the app icon in your system tray/dock, select <strong>Quit</strong> (not just closing the window), and use the web links above while it restarts.
+              </div>
+            </details>
+
+            <details class="group rounded-xl border border-slate-200 bg-slate-50/70 open:bg-white transition">
+              <summary class="flex items-center justify-between p-3 cursor-pointer text-xs font-semibold text-slate-800">
+                <span class="flex items-center gap-2">
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  4. When to Contact IT Helpdesk
+                </span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-3 pb-3 text-xs text-slate-600 leading-relaxed">
+                If all M365 services show <strong>Available</strong> above and incognito mode still shows an error code (such as <em>AADSTS</em> or license expired), screenshot the error message and share it with your IT Helpdesk.
+              </div>
+            </details>
           </div>
         </div>
 
-        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div class="p-3.5 rounded-xl bg-slatex-900/90 border border-slate-800/90">
-            <div class="flex items-center gap-2 font-bold text-white mb-1">
-              <i data-lucide="globe" class="w-3.5 h-3.5 text-sky-400"></i>
-              <span>1. Try the Browser Version</span>
-            </div>
-            <p class="text-slate-400 leading-relaxed">
-              If desktop Outlook or Teams won't load, open <span class="text-slate-200">outlook.office.com</span> or <span class="text-slate-200">teams.microsoft.com</span> in a private/incognito window to bypass stale local app caches.
-            </p>
-          </div>
-
-          <div class="p-3.5 rounded-xl bg-slatex-900/90 border border-slate-800/90">
-            <div class="flex items-center gap-2 font-bold text-white mb-1">
-              <i data-lucide="wifi" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>2. Toggle VPN or Wi-Fi</span>
-            </div>
-            <p class="text-slate-400 leading-relaxed">
-              Corporate VPN tunnels or captive hotel/airport Wi-Fi portals frequently block real-time Teams audio and OneDrive sync. Reconnect your VPN or test on a mobile hotspot.
-            </p>
-          </div>
-
-          <div class="p-3.5 rounded-xl bg-slatex-900/90 border border-slate-800/90">
-            <div class="flex items-center gap-2 font-bold text-white mb-1">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-400"></i>
-              <span>3. Fully Quit &amp; Restart Teams</span>
-            </div>
-            <p class="text-slate-400 leading-relaxed">
-              Closing the Teams window only minimizes it. Right-click the Teams icon in your taskbar/dock, choose <span class="text-slate-200">Quit</span>, wait 10 seconds, and reopen.
-            </p>
-          </div>
-
-          <div class="p-3.5 rounded-xl bg-slatex-900/90 border border-slate-800/90">
-            <div class="flex items-center gap-2 font-bold text-white mb-1">
-              <i data-lucide="key-round" class="w-3.5 h-3.5 text-emerald-400"></i>
-              <span>4. Refresh Your Sign-In Session</span>
-            </div>
-            <p class="text-slate-400 leading-relaxed">
-              If documents say "Sign in required," sign out of any Office app, approve your Authenticator MFA prompt, and sign back in with your work email.
-            </p>
-          </div>
-        </div>
       </div>
-
     </section>
   </main>
 
-  <!-- Simple Footer -->
-  <footer class="border-t border-slate-800/80 bg-slatex-950/60 py-4 px-4 sm:px-6 text-center text-xs text-slate-500">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-      <span>M365 Service Status Dashboard • End-User Edition</span>
-      <div class="flex items-center gap-4">
-        <a href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition">Microsoft Service Health</a>
+  <!-- Clean Footer with Live Data Attribution -->
+  <footer class="border-t border-slate-200 bg-white py-4 px-4 sm:px-6 text-xs text-slate-500">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+        <span class="font-semibold text-slate-700">M365 Live Service Status</span>
         <span>•</span>
-        <a href="https://downdetector.com/status/microsoft-365/" target="_blank" rel="noopener noreferrer" class="hover:text-amber-400 transition">Downdetector M365</a>
+        <span>
+          Live Feed: <a href="https://microsoftradar.com/" target="_blank" rel="noopener noreferrer" class="text-[#0078D4] hover:underline font-medium">MicrosoftRadar</a>
+        </span>
+      </div>
+      <div class="flex items-center gap-4 flex-wrap justify-center">
+        <a href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer" class="hover:text-slate-900 transition">status.cloud.microsoft</a>
+        <span>•</span>
+        <a href="https://downdetector.com/status/microsoft-365/" target="_blank" rel="noopener noreferrer" class="hover:text-slate-900 transition">Downdetector</a>
+        <span>•</span>
+        <button id="open-sync-modal-btn" class="text-slate-500 hover:text-[#0078D4] underline decoration-dotted underline-offset-4 transition">
+          How Live Sync Works
+        </button>
       </div>
     </div>
   </footer>
 
-  <!-- Application Logic -->
+  <!-- Application Logic: Live Real-Time Telemetry Fetcher -->
   <script>
     /**
      * ============================================================================
-     * 1. END-USER APP & SERVICE DEFINITIONS
+     * 1. CORE WORKLOAD MAPPING DEFINITIONS
+     * Maps live API component slugs/names to approachable end-user app cards.
      * ============================================================================
      */
-    const M365_APPS = [
+    const CORE_WORKLOADS = [
       {
-        id: 'outlook',
+        key: 'exchange',
+        matchSlugs: ['exchange-online', 'exchange', 'outlook', 'outlook-on-the-web'],
+        matchKeywords: ['exchange', 'outlook'],
         name: 'Outlook & Email',
         subtitle: 'Exchange Online & Calendar',
-        icon: 'mail',
-        uptime: '99.99%',
-        reports: [12, 14, 11, 15, 13, 18, 14, 12, 15, 13, 11, 14],
-        normalNote: 'Sending, receiving, and calendar invites are working smoothly.',
-        slowNote: 'Some emails may take a few extra minutes to arrive.',
-        outageNote: 'Trouble loading inbox or signing into Outlook.'
+        icon: 'mail'
       },
       {
-        id: 'teams',
+        key: 'teams',
+        matchSlugs: ['teams', 'microsoft-teams'],
+        matchKeywords: ['teams'],
         name: 'Microsoft Teams',
         subtitle: 'Meetings, Chat & Calls',
-        icon: 'video',
-        uptime: '99.98%',
-        reports: [18, 22, 19, 24, 20, 21, 17, 19, 23, 18, 16, 19],
-        normalNote: 'Chat messages, video meetings, and screen sharing are healthy.',
-        slowNote: 'Online status badges may update slowly; calls work normally.',
-        outageNote: 'Difficulty joining meetings or sending chat messages.'
+        icon: 'video'
       },
       {
-        id: 'onedrive',
+        key: 'onedrive',
+        matchSlugs: ['onedrive', 'onedrive-for-business'],
+        matchKeywords: ['onedrive'],
         name: 'OneDrive',
         subtitle: 'Personal Cloud Files & Sync',
-        icon: 'cloud',
-        uptime: '99.99%',
-        reports: [6, 8, 7, 6, 9, 7, 8, 6, 7, 8, 6, 7],
-        normalNote: 'File uploads, downloads, and desktop folder sync are normal.',
-        slowNote: 'File sync status icons are working normally.',
-        outageNote: 'Delays opening or syncing cloud files.'
+        icon: 'cloud'
       },
       {
-        id: 'sharepoint',
+        key: 'sharepoint',
+        matchSlugs: ['sharepoint', 'sharepoint-online'],
+        matchKeywords: ['sharepoint'],
         name: 'SharePoint',
         subtitle: 'Team Sites & Intranet',
-        icon: 'globe',
-        uptime: '99.99%',
-        reports: [8, 9, 7, 10, 8, 9, 11, 8, 7, 9, 8, 8],
-        normalNote: 'Team sites, document libraries, and intranet pages load fast.',
-        slowNote: 'Site pages and shared files are accessible.',
-        outageNote: 'Team sites may fail to load or time out.'
+        icon: 'globe'
       },
       {
-        id: 'officeapps',
+        key: 'office',
+        matchSlugs: ['microsoft-365-apps', 'office-on-the-web', 'office-online', 'word', 'excel'],
+        matchKeywords: ['microsoft 365 apps', 'office', 'word', 'excel'],
         name: 'Word, Excel & PowerPoint',
         subtitle: 'Microsoft 365 Desktop & Web Apps',
-        icon: 'file-text',
-        uptime: '99.99%',
-        reports: [7, 8, 7, 9, 8, 7, 8, 9, 7, 6, 8, 7],
-        normalNote: 'Co-authoring, AutoSave, and Office web apps are operating normally.',
-        slowNote: 'Desktop editing works; AutoSave may pause briefly.',
-        outageNote: 'Cloud document saving or license check delays.'
+        icon: 'file-text'
       },
       {
-        id: 'copilot',
+        key: 'copilot',
+        matchSlugs: ['microsoft-365-copilot', 'copilot'],
+        matchKeywords: ['copilot'],
         name: 'Microsoft Copilot',
         subtitle: 'AI Assistant in M365 Apps',
-        icon: 'sparkles',
-        uptime: '99.97%',
-        reports: [9, 12, 14, 11, 13, 15, 12, 10, 11, 12, 10, 11],
-        normalNote: 'Copilot chat, meeting recaps, and document drafting are responsive.',
-        slowNote: 'Prompts and meeting summaries are operating normally.',
-        outageNote: 'Copilot responses may time out temporarily.'
+        icon: 'sparkles'
       },
       {
-        id: 'signin',
+        key: 'entra',
+        matchSlugs: ['entra-id', 'microsoft-entra-id', 'azure-active-directory', 'authentication'],
+        matchKeywords: ['entra', 'active directory', 'identity', 'sign-in'],
         name: 'Sign-In & MFA',
-        subtitle: 'Microsoft Account & Authenticator',
-        icon: 'key-round',
-        uptime: '100.0%',
-        reports: [10, 11, 9, 12, 10, 11, 9, 10, 11, 10, 9, 10],
-        normalNote: 'Single sign-on and Multi-Factor Authentication prompts are fast.',
-        slowNote: 'Sign-in prompts are responding within normal times.',
-        outageNote: 'Repeated sign-in prompts or authentication errors.'
+        subtitle: 'Microsoft Entra ID & Authenticator',
+        icon: 'key-round'
       },
       {
-        id: 'planner',
+        key: 'planner',
+        matchSlugs: ['planner', 'to-do', 'microsoft-planner', 'microsoft-to-do'],
+        matchKeywords: ['planner', 'to do', 'to-do'],
         name: 'Planner & To Do',
         subtitle: 'Task Boards & Daily Lists',
-        icon: 'check-square',
-        uptime: '99.99%',
-        reports: [4, 5, 6, 4, 5, 7, 5, 4, 5, 4, 5, 4],
-        normalNote: 'Task boards, checklists, and Planner tabs in Teams are healthy.',
-        slowNote: 'Tasks and due-date reminders are syncing normally.',
-        outageNote: 'Task boards may take longer than usual to load.'
+        icon: 'check-square'
       }
     ];
 
-    const USER_ADVISORIES = {
-      healthy: [
-        {
-          id: 'UPDATE',
-          severity: 'resolved',
-          service: 'Microsoft Teams',
-          title: 'Resolved: Brief delay loading channel tabs yesterday',
-          time: 'Resolved • All Clear',
-          summary: 'A temporary slowdown affecting channel tab loading was resolved. No action is needed from users—restart Teams only if a tab still looks stuck.'
-        },
-        {
-          id: 'STATUS',
-          severity: 'info',
-          service: 'Microsoft 365 Suite',
-          title: 'All Microsoft 365 services are operating normally',
-          time: 'Live Baseline',
-          summary: 'Both Microsoft’s public status page and community outage reports show normal activity across all apps.'
-        }
-      ],
-      advisory: [
-        {
-          id: 'SLOWDOWN',
-          severity: 'advisory',
-          service: 'Outlook & Email',
-          title: 'Minor Slowdown: Slight delay receiving some external emails',
-          time: 'Active Notice (Preview)',
-          summary: 'Microsoft is working on a mail-routing delay. Your emails are safe in the queue and will arrive automatically—you do not need to ask senders to resend.'
-        },
-        {
-          id: 'SLOWDOWN',
-          severity: 'advisory',
-          service: 'Microsoft Teams',
-          title: 'Minor Slowdown: Availability status dots may lag behind',
-          time: 'Active Notice (Preview)',
-          summary: 'Someone shown as "Away" may actually be online. Chat messages, audio calls, and video meetings continue to work normally.'
-        }
-      ],
-      outage: [
-        {
-          id: 'DISRUPTION',
-          severity: 'incident',
-          service: 'Sign-In & Core M365 Apps',
-          title: 'Service Disruption: Trouble signing into Outlook, Teams, and SharePoint',
-          time: 'Active Disruption (Preview)',
-          summary: 'Microsoft engineers are actively rolling back a network update causing sign-in timeouts. Tip: Keep any already-open browser tabs active and avoid repeatedly signing out.'
-        },
-        {
-          id: 'WORKAROUND',
-          severity: 'advisory',
-          service: 'Recommended User Action',
-          title: 'What you can do right now',
-          time: 'User Guidance',
-          summary: 'If desktop apps fail to connect, try opening outlook.office.com or teams.microsoft.com in your browser, or check back in 15–30 minutes.'
-        }
-      ]
+    const LIVE_ENDPOINTS = {
+      localStatus: './status.json',
+      remoteSummary: 'https://microsoftradar.com/scope/microsoft-365/api/v2/summary.json',
+      remoteIncidents: 'https://microsoftradar.com/api/v2/incidents.json'
+    };
+
+    const state = {
+      secondsRemaining: 60,
+      isFetching: false,
+      lastSummary: null,
+      lastIncidents: []
     };
 
     /**
      * ============================================================================
-     * 2. STATE & UTILITIES
+     * 2. UI HELPERS & STATUS NORMALIZATION
      * ============================================================================
      */
-    const state = {
-      simMode: 'healthy', // 'healthy' | 'advisory' | 'outage'
-      customWebhookUrl: localStorage.getItem('m365_enduser_webhook') || ''
-    };
-
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
-      const colors = {
-        info: 'bg-slatex-850 border-sky-500/40 text-sky-200',
-        success: 'bg-slatex-850 border-emerald-500/40 text-emerald-200',
-        warn: 'bg-slatex-850 border-amber-500/40 text-amber-200'
+      const styles = {
+        info: 'bg-white border-sky-200 text-slate-800',
+        success: 'bg-white border-emerald-200 text-emerald-800',
+        warn: 'bg-white border-amber-200 text-amber-900'
       };
-      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-xl text-xs font-medium backdrop-blur-md transition-all duration-300 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
-      toast.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i><span>${message}</span>`;
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-lg text-xs font-semibold transition-all duration-300 translate-y-2 opacity-0 ${styles[type] || styles.info}`;
+      toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-[#0078D4] shrink-0"></i><span>${escapeHtml(message)}</span>`;
       container.appendChild(toast);
       lucide.createIcons({ nodes: [toast] });
 
-      requestAnimationFrame(() => {
-        toast.classList.remove('translate-y-2', 'opacity-0');
-      });
-
+      requestAnimationFrame(() => toast.classList.remove('translate-y-2', 'opacity-0'));
       setTimeout(() => {
         toast.classList.add('translate-y-2', 'opacity-0');
         setTimeout(() => toast.remove(), 300);
-      }, 2600);
+      }, 2800);
     }
 
-    function updateClock() {
-      const now = new Date();
-      const clockEl = document.getElementById('live-clock');
-      if (clockEl) {
-        clockEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatRelativeTime(isoString) {
+      if (!isoString) return '';
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+      if (diffSec < 60) return 'Just now';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function getStatusBadgeUI(rawStatus) {
+      const normalized = (rawStatus || 'operational').toLowerCase();
+      if (normalized === 'major_outage' || normalized === 'critical') {
+        return {
+          label: 'Disrupted',
+          pillClass: 'bg-rose-50 text-rose-700 border-rose-200',
+          dotClass: 'bg-rose-500',
+          cardBorder: 'border-rose-300 ring-1 ring-rose-100',
+          note: 'Active service disruption reported. Check Microsoft Official Status for updates.'
+        };
+      }
+      if (normalized === 'partial_outage' || normalized === 'degraded_performance' || normalized === 'minor') {
+        return {
+          label: 'Slowdown',
+          pillClass: 'bg-amber-50 text-amber-800 border-amber-200',
+          dotClass: 'bg-amber-500',
+          cardBorder: 'border-amber-300 ring-1 ring-amber-100',
+          note: 'Degraded performance or intermittent delays detected.'
+        };
+      }
+      if (normalized === 'under_maintenance' || normalized === 'maintenance') {
+        return {
+          label: 'Maintenance',
+          pillClass: 'bg-sky-50 text-sky-700 border-sky-200',
+          dotClass: 'bg-sky-500',
+          cardBorder: 'border-sky-200',
+          note: 'Scheduled service maintenance currently underway.'
+        };
+      }
+      return {
+        label: 'Available',
+        pillClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        dotClass: 'bg-emerald-500',
+        cardBorder: 'border-slate-200 hover:border-slate-300',
+        note: 'Operating normally with no reported disruptions.'
+      };
+    }
+
+    /**
+     * ============================================================================
+     * 3. REAL-TIME LIVE FETCH ENGINE (NO FAKE / SIMULATED STATES)
+     * ============================================================================
+     */
+    async function fetchWithTimeout(url, timeoutMs = 6500) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          signal: controller.signal,
+          cache: 'no-store'
+        });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } catch (err) {
+        clearTimeout(timer);
+        throw err;
       }
     }
 
-    async function syncLiveStatus() {
-      const refreshIcon = document.getElementById('refresh-icon');
-      const lastCheckedEl = document.getElementById('last-checked');
-      const badgeTextEl = document.getElementById('feed-source-text');
-      const badgeEl = document.getElementById('feed-source-badge');
+    async function fetchLiveTelemetry(isManual = false) {
+      if (state.isFetching) return;
+      state.isFetching = true;
 
+      const refreshIcon = document.getElementById('refresh-icon');
+      const badgeText = document.getElementById('feed-source-text');
+      const badgeEl = document.getElementById('feed-source-badge');
       if (refreshIcon) refreshIcon.classList.add('animate-spin');
 
-      try {
-        if (state.customWebhookUrl) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
-          const res = await fetch(state.customWebhookUrl, { signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.overall) {
-              state.simMode = data.overall === 'outage' ? 'outage' : data.overall === 'degraded' ? 'advisory' : 'healthy';
-            }
-            badgeTextEl.textContent = 'Custom Status Feed Connected';
-            badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
-          } else {
-            throw new Error('Custom feed unavailable');
-          }
-        } else {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4000);
-          const feedUrl = encodeURIComponent('https://status.cloud.microsoft/api/feed/mac');
-          const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${feedUrl}`, { signal: controller.signal });
-          clearTimeout(timeoutId);
+      let summaryData = null;
+      let sourceLabel = '';
 
-          if (res.ok) {
-            const payload = await res.json();
-            if (payload && payload.status === 'ok') {
-              badgeTextEl.textContent = 'Public Status Bridge Synced';
-              badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
-            } else {
-              throw new Error('Upstream CORS protection');
-            }
-          } else {
-            throw new Error('Bridge unreachable');
+      try {
+        // 1. Check if repo maintainer configured an optional local ./status.json sync
+        try {
+          const localData = await fetchWithTimeout(LIVE_ENDPOINTS.localStatus, 2000);
+          if (localData && Array.isArray(localData.components)) {
+            summaryData = localData;
+            sourceLabel = 'Live Feed: Repository Status Sync (status.json)';
           }
+        } catch (_) {
+          // Expected when ./status.json is not present; proceed directly to live public API
         }
-      } catch (err) {
-        badgeTextEl.textContent = 'Public Baseline Ready • Click Links Above to Verify Live';
-        badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/25';
+
+        // 2. Primary Live CORS-Enabled Microsoft 365 Status API
+        if (!summaryData) {
+          summaryData = await fetchWithTimeout(LIVE_ENDPOINTS.remoteSummary, 7000);
+          sourceLabel = 'Live Feed: MicrosoftRadar Public M365 Telemetry';
+        }
+
+        // 3. Also fetch recent/active Microsoft incident history in parallel
+        let incidentsList = [];
+        try {
+          const incPayload = await fetchWithTimeout(LIVE_ENDPOINTS.remoteIncidents, 6500);
+          if (incPayload && Array.isArray(incPayload.incidents)) {
+            incidentsList = incPayload.incidents;
+          }
+        } catch (_) {
+          // If incidents endpoint times out, still render summary incidents if present
+          incidentsList = Array.isArray(summaryData.incidents) ? summaryData.incidents : [];
+        }
+
+        state.lastSummary = summaryData;
+        state.lastIncidents = incidentsList;
+
+        // Update Live Source Strip
+        badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
+        badgeText.textContent = sourceLabel;
+
+        const genAtEl = document.getElementById('feed-generated-at');
+        if (summaryData.page && summaryData.page.updated_at) {
+          genAtEl.textContent = `• Feed updated ${formatRelativeTime(summaryData.page.updated_at)}`;
+        } else {
+          genAtEl.textContent = '';
+        }
+
+        renderLiveDashboard(summaryData, incidentsList);
+
+        if (isManual) {
+          showToast('Live Microsoft 365 status updated', 'success');
+        }
+      } catch (error) {
+        // Real error handling: Never fake a green status if unreachable!
+        renderOfflineErrorState(error);
+        if (isManual) {
+          showToast('Unable to reach live telemetry feed', 'warn');
+        }
       } finally {
-        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        if (lastCheckedEl) lastCheckedEl.textContent = `Checked ${nowStr}`;
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('last-checked').textContent = `Checked ${nowStr}`;
+        state.secondsRemaining = 60;
+        state.isFetching = false;
         setTimeout(() => {
           if (refreshIcon) refreshIcon.classList.remove('animate-spin');
-        }, 450);
-        renderDashboard();
+        }, 400);
       }
     }
 
     /**
      * ============================================================================
-     * 3. RENDER DASHBOARD COMPONENTS
+     * 4. RENDER LIVE DATA TO UI
      * ============================================================================
      */
-    function buildMiniSparkline(points, strokeColor) {
-      const max = Math.max(...points, 30);
-      const min = 0;
-      const w = 96;
-      const h = 26;
-      const coords = points.map((val, idx) => {
-        const x = (idx / (points.length - 1)) * w;
-        const y = h - ((val - min) / (max - min)) * (h - 4) - 2;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      }).join(' ');
+    function renderLiveDashboard(summary, allIncidents) {
+      const components = Array.isArray(summary.components) ? summary.components : [];
+      const unresolvedIncidents = Array.isArray(summary.incidents) ? summary.incidents : [];
+      const indicator = (summary.status && summary.status.indicator) ? summary.status.indicator.toLowerCase() : 'none';
+      const statusDescription = (summary.status && summary.status.description) ? summary.status.description : 'All Systems Operational';
 
-      return `
-        <svg viewBox="0 0 ${w} ${h}" class="w-20 h-6 overflow-visible shrink-0" aria-hidden="true">
-          <polyline fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="${coords}" />
-        </svg>
-      `;
-    }
-
-    function renderDashboard() {
-      const mode = state.simMode;
-
-      // Update Preview State Buttons
-      document.querySelectorAll('.sim-btn').forEach(btn => {
-        const btnMode = btn.dataset.sim;
-        if (btnMode === mode) {
-          if (mode === 'healthy') {
-            btn.className = 'sim-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition';
-          } else if (mode === 'advisory') {
-            btn.className = 'sim-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 transition';
-          } else {
-            btn.className = 'sim-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 transition';
-          }
-        } else {
-          btn.className = 'sim-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slatex-900 text-slate-400 border border-slate-700/70 hover:text-slate-200 transition';
-        }
-      });
-
-      // 1. Update Hero Banner
+      // 1. Render Overall Hero Banner based strictly on live API status
       const banner = document.getElementById('overall-banner');
       const iconWrap = document.getElementById('overall-icon-wrap');
       const pulse = document.getElementById('overall-pulse');
@@ -818,317 +767,292 @@
       const pill = document.getElementById('overall-pill');
       const subtitle = document.getElementById('overall-subtitle');
 
-      if (mode === 'healthy') {
-        banner.className = 'relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/50 via-slatex-850 to-slatex-850 p-5 sm:p-6 shadow-xl';
-        iconWrap.className = 'relative w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0';
-        pulse.className = 'status-pulse w-3.5 h-3.5 rounded-full bg-emerald-400';
-        title.textContent = 'All Microsoft 365 Apps Are Up & Running';
-        pill.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
-        pill.textContent = 'Healthy';
-        subtitle.textContent = 'Outlook, Teams, OneDrive, SharePoint, and Office apps are working normally. If you experience an issue, check your Wi-Fi/VPN or try the web app.';
-      } else if (mode === 'advisory') {
-        banner.className = 'relative overflow-hidden rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/50 via-slatex-850 to-slatex-850 p-5 sm:p-6 shadow-xl';
-        iconWrap.className = 'relative w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0';
-        pulse.className = 'status-pulse w-3.5 h-3.5 rounded-full bg-amber-400';
-        title.textContent = 'Minor Slowdowns in Outlook & Teams';
-        pill.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30';
-        pill.textContent = 'Minor Slowdown';
-        subtitle.textContent = 'Emails may take a few extra minutes to arrive and Teams status dots may lag. Core meetings, files, and Office apps remain available.';
-      } else {
-        banner.className = 'relative overflow-hidden rounded-2xl border border-rose-500/50 bg-gradient-to-r from-rose-950/60 via-slatex-850 to-slatex-850 p-5 sm:p-6 shadow-xl';
-        iconWrap.className = 'relative w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0';
-        pulse.className = 'status-pulse w-3.5 h-3.5 rounded-full bg-rose-500';
-        title.textContent = 'Service Disruption: Trouble Signing Into Microsoft 365';
-        pill.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40';
+      const degradedCount = components.filter(c => c.status && c.status !== 'operational').length;
+
+      if (indicator === 'critical' || indicator === 'major') {
+        banner.className = 'relative overflow-hidden rounded-2xl border border-rose-300 bg-gradient-to-r from-rose-50 via-white to-white p-5 sm:p-6 shadow-sm';
+        iconWrap.className = 'relative w-12 h-12 rounded-2xl bg-rose-100 border border-rose-200 flex items-center justify-center shrink-0';
+        pulse.className = 'status-pulse w-3.5 h-3.5 rounded-full bg-rose-600';
+        title.textContent = statusDescription;
+        pill.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200';
         pill.textContent = 'Service Disruption';
-        subtitle.textContent = 'Some users may see sign-in errors when opening Outlook, Teams, or SharePoint. Microsoft is actively working on a fix.';
+        subtitle.textContent = `Live telemetry reports active disruption across ${degradedCount || 'one or more'} Microsoft 365 service(s). See active incident details below.`;
+      } else if (indicator === 'minor' || degradedCount > 0 || unresolvedIncidents.length > 0) {
+        banner.className = 'relative overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-white to-white p-5 sm:p-6 shadow-sm';
+        iconWrap.className = 'relative w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0';
+        pulse.className = 'status-pulse w-3.5 h-3.5 rounded-full bg-amber-500';
+        title.textContent = statusDescription !== 'All Systems Operational' ? statusDescription : 'Partial Service Degradation Detected';
+        pill.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200';
+        pill.textContent = 'Advisory / Slowdown';
+        subtitle.textContent = `Live telemetry indicates ${degradedCount} service(s) experiencing degraded performance or active advisories.`;
+      } else {
+        banner.className = 'relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50/80 via-white to-white p-5 sm:p-6 shadow-sm';
+        iconWrap.className = 'relative w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center shrink-0';
+        pulse.className = 'status-pulse w-3.5 h-3.5 rounded-full bg-emerald-500';
+        title.textContent = 'All Microsoft 365 Services Operational';
+        pill.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+        pill.textContent = 'Operational';
+        subtitle.textContent = 'Live telemetry shows Outlook, Teams, OneDrive, SharePoint, and Microsoft 365 apps operating normally.';
       }
 
-      // 2. Render End-User App Cards
-      const grid = document.getElementById('services-grid');
-      grid.innerHTML = M365_APPS.map(app => {
-        let currentStatus = 'operational';
-        let reports = [...app.reports];
-        let note = app.normalNote;
+      // 2. Render Active Unresolved Incidents Banner (only if live unresolved incidents exist)
+      const activeSection = document.getElementById('active-incidents-section');
+      const activeList = document.getElementById('active-incidents-list');
+      if (unresolvedIncidents.length > 0) {
+        activeSection.classList.remove('hidden');
+        activeList.innerHTML = unresolvedIncidents.map(inc => {
+          const latestUpdate = Array.isArray(inc.incident_updates) && inc.incident_updates[0]
+            ? inc.incident_updates[0].body
+            : 'Microsoft is investigating this issue.';
+          return `
+            <div class="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 shadow-xs">
+              <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-rose-600 text-white uppercase">
+                  ${escapeHtml(inc.status || 'Investigating')}
+                </span>
+                <span class="text-xs text-rose-700 font-medium">${formatRelativeTime(inc.updated_at || inc.created_at)}</span>
+              </div>
+              <h4 class="text-sm font-bold text-slate-900 mb-1">${escapeHtml(inc.name)}</h4>
+              <p class="text-xs text-slate-700 leading-relaxed whitespace-pre-line">${escapeHtml(latestUpdate)}</p>
+            </div>
+          `;
+        }).join('');
+      } else {
+        activeSection.classList.add('hidden');
+        activeList.innerHTML = '';
+      }
 
-        if (mode === 'advisory' && (app.id === 'outlook' || app.id === 'teams')) {
-          currentStatus = 'advisory';
-          reports = reports.map((v, i) => i > 8 ? v * 3.8 : v);
-          note = app.slowNote;
-        } else if (mode === 'outage' && (app.id === 'signin' || app.id === 'outlook' || app.id === 'teams' || app.id === 'sharepoint')) {
-          currentStatus = app.id === 'signin' ? 'incident' : 'advisory';
-          reports = reports.map((v, i) => i > 7 ? v * 7.5 : v);
-          note = app.outageNote;
+      // 3. Map Live API Components onto End-User App Cards
+      const usedComponentIds = new Set();
+      const mappedCards = CORE_WORKLOADS.map(workload => {
+        const matched = components.find(comp => {
+          const slug = (comp.slug || '').toLowerCase();
+          const name = (comp.name || '').toLowerCase();
+          return workload.matchSlugs.includes(slug) || workload.matchKeywords.some(kw => name.includes(kw));
+        });
+
+        if (matched && matched.id) {
+          usedComponentIds.add(matched.id);
         }
 
-        const badgeMap = {
-          operational: {
-            label: 'Available',
-            cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-            dot: 'bg-emerald-400',
-            border: 'border-slate-800 hover:border-slate-700',
-            stroke: '#34d399'
-          },
-          advisory: {
-            label: 'Slowdown',
-            cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-            dot: 'bg-amber-400',
-            border: 'border-amber-500/40',
-            stroke: '#fbbf24'
-          },
-          incident: {
-            label: 'Disrupted',
-            cls: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-            dot: 'bg-rose-500',
-            border: 'border-rose-500/50',
-            stroke: '#f43f5e'
-          }
-        };
-
-        const ui = badgeMap[currentStatus];
+        const liveStatus = matched ? matched.status : 'operational';
+        const ui = getStatusBadgeUI(liveStatus);
+        const updatedText = matched && matched.updated_at
+          ? `Updated ${formatRelativeTime(matched.updated_at)}`
+          : 'Live telemetry active';
 
         return `
-          <div class="bg-slatex-850 border ${ui.border} rounded-2xl p-4 flex flex-col justify-between transition shadow-sm">
+          <div class="bg-white border ${ui.cardBorder} rounded-2xl p-4 flex flex-col justify-between transition shadow-xs">
             <div>
               <div class="flex items-start justify-between gap-2">
                 <div class="flex items-center gap-2.5 min-w-0">
-                  <div class="p-2 rounded-xl bg-slatex-900 border border-slate-800 text-sky-400 shrink-0">
-                    <i data-lucide="${app.icon}" class="w-4 h-4"></i>
+                  <div class="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[#0078D4] shrink-0">
+                    <i data-lucide="${workload.icon}" class="w-4 h-4"></i>
                   </div>
                   <div class="min-w-0">
-                    <h4 class="text-sm font-bold text-white truncate">${app.name}</h4>
-                    <p class="text-[11px] text-slate-400 truncate">${app.subtitle}</p>
+                    <h4 class="text-sm font-bold text-slate-900 truncate">${escapeHtml(workload.name)}</h4>
+                    <p class="text-[11px] text-slate-500 truncate">${escapeHtml(workload.subtitle)}</p>
                   </div>
                 </div>
-                <span class="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${ui.cls}">
-                  <span class="w-1.5 h-1.5 rounded-full ${ui.dot}"></span>
+                <span class="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${ui.pillClass}">
+                  <span class="w-1.5 h-1.5 rounded-full ${ui.dotClass}"></span>
                   ${ui.label}
                 </span>
               </div>
-              <p class="text-xs text-slate-300 mt-3 leading-relaxed">${note}</p>
+              <p class="text-xs text-slate-600 mt-3 leading-relaxed">${ui.note}</p>
             </div>
 
-            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+            <div class="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <span>${updatedText}</span>
+              <span class="font-mono text-slate-500">${matched ? escapeHtml(matched.slug || '') : 'm365'}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      // Also surface any extra M365 components from the live feed that have a non-operational issue
+      const extraAffectedCards = components
+        .filter(comp => !usedComponentIds.has(comp.id) && comp.status && comp.status !== 'operational')
+        .map(comp => {
+          const ui = getStatusBadgeUI(comp.status);
+          return `
+            <div class="bg-white border ${ui.cardBorder} rounded-2xl p-4 flex flex-col justify-between transition shadow-xs">
               <div>
-                <span class="text-[10px] uppercase tracking-wider text-slate-500 block">24h Stability</span>
-                <span class="text-xs font-mono font-semibold text-slate-200">${app.uptime}</span>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 shrink-0">
+                      <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    </div>
+                    <div class="min-w-0">
+                      <h4 class="text-sm font-bold text-slate-900 truncate">${escapeHtml(comp.name)}</h4>
+                      <p class="text-[11px] text-slate-500 truncate">Microsoft 365 Service</p>
+                    </div>
+                  </div>
+                  <span class="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${ui.pillClass}">
+                    <span class="w-1.5 h-1.5 rounded-full ${ui.dotClass}"></span>
+                    ${ui.label}
+                  </span>
+                </div>
+                <p class="text-xs text-slate-600 mt-3 leading-relaxed">${ui.note}</p>
               </div>
-              ${buildMiniSparkline(reports, ui.stroke)}
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      // 3. Render Plain-English Advisories
-      const advisoriesList = document.getElementById('advisories-list');
-      const items = USER_ADVISORIES[mode] || USER_ADVISORIES.healthy;
-      advisoriesList.innerHTML = items.map(item => {
-        const sevStyles = {
-          resolved: 'border-emerald-500/25 bg-emerald-500/5 text-emerald-300',
-          info: 'border-sky-500/25 bg-sky-500/5 text-sky-300',
-          advisory: 'border-amber-500/35 bg-amber-500/10 text-amber-300',
-          incident: 'border-rose-500/45 bg-rose-500/10 text-rose-300'
-        };
-        return `
-          <div class="p-3.5 rounded-xl border ${sevStyles[item.severity] || sevStyles.info}">
-            <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-950/70 text-white border border-slate-700/80">
-                  ${item.id}
-                </span>
-                <span class="text-xs font-semibold text-slate-200">${item.service}</span>
+              <div class="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Updated ${formatRelativeTime(comp.updated_at)}</span>
+                <span class="font-mono text-slate-500">${escapeHtml(comp.slug || '')}</span>
               </div>
-              <span class="text-[11px] font-medium opacity-90">${item.time}</span>
             </div>
-            <h4 class="text-xs sm:text-sm font-bold text-white mb-1">${item.title}</h4>
-            <p class="text-xs text-slate-300 leading-relaxed">${item.summary}</p>
-          </div>
-        `;
-      }).join('');
+          `;
+        });
 
-      // 4. Render Interactive 24h Outage Chart
-      renderOutageChart(mode);
+      const allCards = [...extraAffectedCards, ...mappedCards];
+      document.getElementById('services-grid').innerHTML = allCards.join('');
+      document.getElementById('component-count-label').textContent = `${allCards.length} Live Workloads Monitored`;
+
+      // 4. Render Real Incident History Feed (filtered to M365-relevant incidents)
+      renderIncidentHistory(allIncidents);
 
       lucide.createIcons();
     }
 
-    function renderOutageChart(mode) {
-      const svg = document.getElementById('outage-chart-svg');
-      const tag = document.getElementById('crowd-status-tag');
-      const peakLabel = document.getElementById('crowd-peak-label');
-      const hoverTimeLabel = document.getElementById('chart-hover-time');
-
-      const timeLabels = [
-        '24h ago', '22h ago', '20h ago', '18h ago', '16h ago', '14h ago',
-        '12h ago', '10h ago', '8h ago', '6h ago', '4h ago', '3h ago',
-        '2h ago', '1h ago', '30m ago', 'Just now'
-      ];
-      const baseline = [11, 10, 9, 8, 9, 12, 16, 19, 17, 15, 16, 18, 15, 14, 13, 14];
-      let reported = [...baseline];
-      let lineColor = '#38bdf8';
-      let fillColor = 'rgba(56, 189, 248, 0.16)';
-      let defaultPeakText = 'Current: 14 reports';
-
-      if (mode === 'healthy') {
-        reported = [10, 9, 8, 8, 10, 13, 15, 18, 16, 14, 15, 17, 14, 13, 12, 14];
-        tag.className = 'px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
-        tag.textContent = 'Normal Baseline';
-        peakLabel.className = 'font-mono font-semibold text-sky-400';
-        defaultPeakText = 'Current: 14 reports';
-        document.getElementById('vec-exchange').textContent = '42%';
-        document.getElementById('bar-exchange').style.width = '42%';
-        document.getElementById('vec-teams').textContent = '33%';
-        document.getElementById('bar-teams').style.width = '33%';
-        document.getElementById('vec-spo').textContent = '25%';
-        document.getElementById('bar-spo').style.width = '25%';
-      } else if (mode === 'advisory') {
-        reported = [10, 9, 8, 8, 10, 13, 15, 18, 16, 14, 24, 58, 96, 142, 168, 154];
-        lineColor = '#fbbf24';
-        fillColor = 'rgba(251, 191, 36, 0.22)';
-        tag.className = 'px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/35';
-        tag.textContent = 'Elevated Reports';
-        peakLabel.className = 'font-mono font-semibold text-amber-400';
-        defaultPeakText = 'Spike: 168 reports';
-        document.getElementById('vec-exchange').textContent = '64%';
-        document.getElementById('bar-exchange').style.width = '64%';
-        document.getElementById('vec-teams').textContent = '26%';
-        document.getElementById('bar-teams').style.width = '26%';
-        document.getElementById('vec-spo').textContent = '10%';
-        document.getElementById('bar-spo').style.width = '10%';
-      } else {
-        reported = [10, 9, 8, 8, 10, 13, 15, 18, 16, 45, 290, 840, 1420, 1890, 2150, 1980];
-        lineColor = '#f43f5e';
-        fillColor = 'rgba(244, 63, 94, 0.25)';
-        tag.className = 'px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40';
-        tag.textContent = 'Major Outage Spike';
-        peakLabel.className = 'font-mono font-semibold text-rose-400';
-        defaultPeakText = 'Peak: 2,150 reports';
-        document.getElementById('vec-exchange').textContent = '51%';
-        document.getElementById('bar-exchange').style.width = '51%';
-        document.getElementById('vec-teams').textContent = '34%';
-        document.getElementById('bar-teams').style.width = '34%';
-        document.getElementById('vec-spo').textContent = '15%';
-        document.getElementById('bar-spo').style.width = '15%';
+    function renderIncidentHistory(incidents) {
+      const container = document.getElementById('recent-incidents-list');
+      if (!Array.isArray(incidents) || incidents.length === 0) {
+        container.innerHTML = `
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
+            No recent incidents reported in the live feed. Click <strong>status.cloud.microsoft</strong> above to view Microsoft's full service history.
+          </div>
+        `;
+        return;
       }
 
-      peakLabel.textContent = defaultPeakText;
+      // Prioritize M365-related incidents, or show the latest 5 overall if none specifically tagged
+      const m365Keywords = ['microsoft 365', 'm365', 'teams', 'exchange', 'outlook', 'sharepoint', 'onedrive', 'copilot', 'entra', 'office', 'planner', 'intune'];
+      const filtered = incidents.filter(inc => {
+        const text = `${inc.name || ''} ${(inc.components || []).map(c => c.name).join(' ')}`.toLowerCase();
+        return m365Keywords.some(kw => text.includes(kw));
+      });
 
-      const maxVal = Math.max(...reported, 40);
-      const w = 400;
-      const h = 120;
+      const displayList = (filtered.length > 0 ? filtered : incidents).slice(0, 5);
 
-      const getPoint = (val, idx) => {
-        const x = (idx / (reported.length - 1)) * w;
-        const y = h - (val / maxVal) * (h - 14) - 6;
-        return { x, y };
-      };
+      container.innerHTML = displayList.map(inc => {
+        const isResolved = (inc.status || '').toLowerCase() === 'resolved' || (inc.status || '').toLowerCase() === 'postmortem';
+        const badgeCls = isResolved
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          : 'bg-amber-50 text-amber-800 border-amber-200';
+        const latestBody = Array.isArray(inc.incident_updates) && inc.incident_updates[0]
+          ? inc.incident_updates[0].body
+          : '';
+        const affectedNames = Array.isArray(inc.components) && inc.components.length > 0
+          ? inc.components.map(c => c.name).join(', ')
+          : 'Microsoft 365';
 
-      const repPoints = reported.map((v, i) => getPoint(v, i));
-      const basePoints = baseline.map((v, i) => getPoint(v, i));
-
-      const repCoords = repPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`);
-      const baseCoords = basePoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`);
-      const areaPoints = `0,${h} ${repCoords.join(' ')} ${w},${h}`;
-
-      const sliceWidth = w / reported.length;
-      const hitZones = repPoints.map((p, idx) => {
-        const rx = Math.max(0, p.x - sliceWidth / 2);
         return `
-          <g class="chart-hover-group">
-            <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${lineColor}" stroke="#070b14" stroke-width="1.5" opacity="0" class="transition-opacity duration-150 pointer-events-none" />
-            <rect x="${rx.toFixed(1)}" y="0" width="${sliceWidth.toFixed(1)}" height="${h}" fill="transparent"
-                  data-idx="${idx}" data-val="${reported[idx]}" data-base="${baseline[idx]}" />
-          </g>
+          <div class="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200">
+            <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${badgeCls}">
+                  ${escapeHtml(inc.status || 'Logged')}
+                </span>
+                <span class="text-xs font-semibold text-slate-700">${escapeHtml(affectedNames)}</span>
+              </div>
+              <span class="text-[11px] text-slate-500">${formatRelativeTime(inc.resolved_at || inc.updated_at || inc.created_at)}</span>
+            </div>
+            <h4 class="text-xs sm:text-sm font-bold text-slate-900 mb-1">${escapeHtml(inc.name)}</h4>
+            ${latestBody ? `<p class="text-xs text-slate-600 leading-relaxed line-clamp-3">${escapeHtml(latestBody)}</p>` : ''}
+          </div>
         `;
       }).join('');
+    }
 
-      svg.innerHTML = `
-        <line x1="0" y1="20" x2="${w}" y2="20" stroke="#1e293b" stroke-dasharray="3 3" stroke-width="1" />
-        <line x1="0" y1="60" x2="${w}" y2="60" stroke="#1e293b" stroke-dasharray="3 3" stroke-width="1" />
-        <line x1="0" y1="100" x2="${w}" y2="100" stroke="#1e293b" stroke-dasharray="3 3" stroke-width="1" />
-        <polyline fill="none" stroke="#475569" stroke-width="1.5" stroke-dasharray="4 3" points="${baseCoords.join(' ')}" />
-        <polygon fill="${fillColor}" points="${areaPoints}" />
-        <polyline fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${repCoords.join(' ')}" />
-        ${hitZones}
+    function renderOfflineErrorState(error) {
+      const badgeEl = document.getElementById('feed-source-badge');
+      const badgeText = document.getElementById('feed-source-text');
+      badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200';
+      badgeText.textContent = 'Live Telemetry Feed Unreachable (Network or Firewall Block)';
+
+      const banner = document.getElementById('overall-banner');
+      const iconWrap = document.getElementById('overall-icon-wrap');
+      const pulse = document.getElementById('overall-pulse');
+      const title = document.getElementById('overall-title');
+      const pill = document.getElementById('overall-pill');
+      const subtitle = document.getElementById('overall-subtitle');
+
+      banner.className = 'relative overflow-hidden rounded-2xl border border-amber-300 bg-amber-50/60 p-5 sm:p-6 shadow-sm';
+      iconWrap.className = 'relative w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0';
+      pulse.className = 'w-3.5 h-3.5 rounded-full bg-amber-500';
+      title.textContent = 'Unable to Fetch Automated Live Status Feed';
+      pill.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200';
+      pill.textContent = 'Check Directly';
+      subtitle.textContent = 'Your browser or network blocked the automated status feed. Rather than guessing, please use the two direct verification buttons on the right to check Microsoft Official Status and Downdetector.';
+
+      document.getElementById('services-grid').innerHTML = `
+        <div class="col-span-full bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-3">
+          <p class="text-sm font-bold text-slate-900">Automated Component Telemetry Unavailable</p>
+          <p class="text-xs text-slate-600 max-w-xl mx-auto">
+            This page never displays simulated green statuses when live data cannot be verified. Click <strong>Refresh Now</strong> to retry or open Microsoft's public status portal directly.
+          </p>
+        </div>
       `;
-
-      // Interactive Hover Tooltip Handler
-      svg.querySelectorAll('rect[data-idx]').forEach(rect => {
-        rect.addEventListener('mouseenter', () => {
-          const idx = Number(rect.dataset.idx);
-          const val = Number(rect.dataset.val).toLocaleString();
-          const base = Number(rect.dataset.base).toLocaleString();
-          hoverTimeLabel.textContent = `${timeLabels[idx]} (Normal: ~${base})`;
-          peakLabel.textContent = `${val} user reports`;
-          const circle = rect.parentElement.querySelector('circle');
-          if (circle) circle.setAttribute('opacity', '1');
-        });
-        rect.addEventListener('mouseleave', () => {
-          hoverTimeLabel.textContent = 'Hover chart to inspect 24h trend';
-          peakLabel.textContent = defaultPeakText;
-          const circle = rect.parentElement.querySelector('circle');
-          if (circle) circle.setAttribute('opacity', '0');
-        });
-      });
+      document.getElementById('component-count-label').textContent = 'Feed Offline';
+      lucide.createIcons();
     }
 
     /**
      * ============================================================================
-     * 4. BOOTSTRAP & EVENT LISTENERS
+     * 5. AUTO-REFRESH COUNTDOWN & EVENT BINDINGS
      * ============================================================================
      */
     window.addEventListener('DOMContentLoaded', () => {
-      updateClock();
-      setInterval(updateClock, 1000);
+      // 60-second live auto-refresh timer
+      setInterval(() => {
+        if (state.isFetching) return;
+        state.secondsRemaining -= 1;
+        if (state.secondsRemaining <= 0) {
+          fetchLiveTelemetry(false);
+        } else {
+          const label = document.getElementById('auto-refresh-label');
+          if (label) label.textContent = `Auto-refresh in ${state.secondsRemaining}s`;
+        }
+      }, 1000);
 
-      // State Preview Toggles
-      document.querySelectorAll('.sim-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          state.simMode = btn.dataset.sim;
-          renderDashboard();
-        });
-      });
-
-      // Manual Refresh Button
+      // Manual Refresh Now button
       document.getElementById('refresh-status-btn').addEventListener('click', () => {
-        syncLiveStatus();
-        showToast('Refreshed M365 service status', 'info');
+        fetchLiveTelemetry(true);
       });
 
-      // Settings Modal Controls
-      const settingsModal = document.getElementById('settings-modal');
-      const webhookInput = document.getElementById('custom-webhook-input');
-      webhookInput.value = state.customWebhookUrl;
-
-      document.getElementById('open-settings-btn').addEventListener('click', () => {
-        settingsModal.classList.remove('hidden');
-        settingsModal.classList.add('flex');
+      // Maintainer "How Live Sync Works" Modal
+      const syncModal = document.getElementById('sync-info-modal');
+      document.getElementById('open-sync-modal-btn').addEventListener('click', () => {
+        syncModal.classList.remove('hidden');
+        syncModal.classList.add('flex');
+      });
+      document.getElementById('close-sync-modal-btn').addEventListener('click', () => {
+        syncModal.classList.add('hidden');
+        syncModal.classList.remove('flex');
+      });
+      syncModal.addEventListener('click', (e) => {
+        if (e.target === syncModal) {
+          syncModal.classList.add('hidden');
+          syncModal.classList.remove('flex');
+        }
       });
 
-      document.getElementById('close-settings-btn').addEventListener('click', () => {
-        settingsModal.classList.add('hidden');
-        settingsModal.classList.remove('flex');
+      // Copy GitHub Action YAML snippet
+      document.getElementById('copy-gha-btn').addEventListener('click', () => {
+        const code = document.getElementById('gha-snippet').textContent;
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('GitHub Action workflow copied to clipboard', 'success');
       });
 
-      document.getElementById('save-settings-btn').addEventListener('click', () => {
-        state.customWebhookUrl = webhookInput.value.trim();
-        localStorage.setItem('m365_enduser_webhook', state.customWebhookUrl);
-        settingsModal.classList.add('hidden');
-        settingsModal.classList.remove('flex');
-        syncLiveStatus();
-        showToast('Status feed settings saved', 'success');
-      });
-
-      document.getElementById('reset-webhook-btn').addEventListener('click', () => {
-        webhookInput.value = '';
-        state.customWebhookUrl = '';
-        localStorage.removeItem('m365_enduser_webhook');
-        showToast('Cleared custom feed URL', 'info');
-      });
-
-      // Initial Render & Live Feed Attempt
-      renderDashboard();
-      syncLiveStatus();
+      // Initial Live Telemetry Fetch
+      lucide.createIcons();
+      fetchLiveTelemetry(false);
     });
   </script>
 </body>
